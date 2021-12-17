@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/nosh
+nosh.so
+nosh.dylib
+nosh.dll
+nosh.a
+nosh.lib
+nosh-test-*
+*.exe
+*.o
+*.obj
+*.lst

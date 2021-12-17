@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"NagayamaRyoga"
+	],
+	"copyright": "Copyright © 2021, NagayamaRyoga",
+	"description": "toy shell implementation",
+	"license": "MIT",
+	"name": "nosh"
+}
