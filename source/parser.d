@@ -1,4 +1,4 @@
-import std.range : empty, front, popFront;
+import std.range : back, empty, front, popFront;
 import std.stdio : File;
 import lexer : Lexer, Token, TokenKind;
 
@@ -22,10 +22,24 @@ class Parser
      * 入力を構文解析する
      *
      * input :==
+     *      EOF
+     *      EOL
      *      command_line
      */
     string[] parse()
     {
+        if (currentToken().isEof)
+        {
+            // EOF
+            return [];
+        }
+
+        if (consumeTokenIf(TokenKind.eol))
+        {
+            // EOL
+            return [];
+        }
+
         // command_line
         return parseCommandLine();
     }
@@ -56,7 +70,17 @@ class Parser
         // WORD*
         while (currentToken().isWord)
         {
-            args ~= currentToken().text;
+            const token = currentToken();
+
+            if (args.empty || token.hasLeadingSpace)
+            {
+                args ~= token.text;
+            }
+            else
+            {
+                args.back ~= token.text;
+            }
+
             consumeToken();
         }
 
@@ -77,10 +101,11 @@ class Parser
         return _lookahead.front;
     }
 
-    private void consumeToken()
+    private Token consumeToken()
     {
-        fillQueue(1);
+        const token = currentToken();
         _lookahead.popFront();
+        return token;
     }
 
     private bool consumeTokenIf(TokenKind kind)

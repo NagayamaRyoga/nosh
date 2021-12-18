@@ -1,3 +1,4 @@
+import std.conv : to;
 import std.range : empty, front, popFront;
 import std.stdio : File;
 
@@ -6,9 +7,14 @@ private bool isSpace(dchar c)
     return c == '\t' || c == ' ';
 }
 
+private bool isSpecial(dchar c)
+{
+    return c == '\n' || c == '\r' || c == '\'' || c == '"';
+}
+
 private bool isWord(dchar c)
 {
-    return !c.isSpace && c != '\n' && c != '\r' && c != '\0';
+    return !c.isSpace && !c.isSpecial && c != '\0';
 }
 
 enum TokenKind
@@ -22,6 +28,7 @@ struct Token
 {
     TokenKind kind;
     string text;
+    bool hasLeadingSpace;
 
     bool isEof() const
     {
@@ -55,24 +62,36 @@ class Lexer
      */
     Token read()
     {
-        skipSpace();
+        const hasLeadingSpace = skipSpace();
 
-        const ch = currentCh();
+        const c = currentCh();
 
         if (eof())
         {
             // EOF
-            return Token(TokenKind.eof, "");
+            return Token(TokenKind.eof, "", hasLeadingSpace);
         }
 
-        if (ch == '\r' || ch == '\n')
+        if (c == '\r' || c == '\n')
         {
             // EOL
-            return readEol();
+            return readEol(hasLeadingSpace);
+        }
+
+        if (c == '\'')
+        {
+            // STRING
+            return readSingleQuotedString(hasLeadingSpace);
+        }
+
+        if (c == '"')
+        {
+            // DSTRING
+            return readDoubleQuotedString(hasLeadingSpace);
         }
 
         // WORD
-        return readWord();
+        return readWord(hasLeadingSpace);
     }
 
     /**
@@ -81,13 +100,18 @@ class Lexer
      * SP :==
      *      [\t ]+
      */
-    private void skipSpace()
+    private bool skipSpace()
     {
+        bool space = false;
+
         // [\t ]*
         while (!eof && currentCh().isSpace)
         {
             consumeCh();
+            space = true;
         }
+
+        return space;
     }
 
     /**
@@ -96,7 +120,7 @@ class Lexer
      * EOL :==
      *      "\r\n" | "\r" | "\n"
      */
-    private Token readEol()
+    private Token readEol(bool hasLeadingSpace)
     {
         string text = "";
 
@@ -112,7 +136,78 @@ class Lexer
             text ~= consumeCh();
         }
 
-        return Token(TokenKind.eol, text);
+        return Token(TokenKind.eol, text, hasLeadingSpace);
+    }
+
+    /**
+     * シングルクォート文字列
+     *
+     * STRING :==
+     *      '\'' [^']* '\''
+     */
+    private Token readSingleQuotedString(bool hasLeadingSpace)
+    {
+        // '\''
+        assert(currentCh() == '\'');
+
+        consumeCh();
+
+        // [^']*
+        string text = "";
+
+        while (currentCh() != '\'')
+        {
+            if (eof)
+            {
+                throw new Exception("unterminated string");
+            }
+
+            text ~= consumeCh();
+        }
+
+        // '\''
+        consumeCh();
+
+        return Token(TokenKind.word, text, hasLeadingSpace);
+    }
+
+    /**
+     * ダブルクォート文字列
+     *
+     * DSTRING :==
+     *      '"' (\\.|[^"])* '"'
+     */
+    private Token readDoubleQuotedString(bool hasLeadingSpace)
+    {
+        // '"'
+        assert(currentCh() == '"');
+
+        consumeCh();
+
+        // (\\.|[^"])*
+        string text = "";
+
+        while (currentCh() != '"')
+        {
+            if (eof)
+            {
+                throw new Exception("unterminated string");
+            }
+
+            if (currentCh() == '\\')
+            {
+                text ~= readEscapedCh();
+            }
+            else
+            {
+                text ~= consumeCh();
+            }
+        }
+
+        // '"'
+        consumeCh();
+
+        return Token(TokenKind.word, text, hasLeadingSpace);
     }
 
     /**
@@ -121,17 +216,49 @@ class Lexer
      * WORD :==
      *      .+
      */
-    private Token readWord()
+    private Token readWord(bool hasLeadingSpace)
     {
         string text = "";
 
         // .*
         while (currentCh().isWord)
         {
-            text ~= consumeCh();
+            if (currentCh() == '\\')
+            {
+                text ~= readEscapedCh();
+            }
+            else
+            {
+                text ~= consumeCh();
+            }
         }
 
-        return Token(TokenKind.word, text);
+        return Token(TokenKind.word, text, hasLeadingSpace);
+    }
+
+    private string readEscapedCh()
+    {
+        // '\\'
+        assert(currentCh() == '\\');
+
+        consumeCh();
+
+        if (currentCh() == '\n' || currentCh() == '\r')
+        {
+            if (currentCh() == '\r')
+            {
+                consumeCh();
+            }
+            if (currentCh() == '\n')
+            {
+                consumeCh();
+            }
+            return "";
+        }
+        else
+        {
+            return consumeCh().to!string;
+        }
     }
 
     private bool eof()
