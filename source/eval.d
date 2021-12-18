@@ -1,12 +1,21 @@
 import std.algorithm : map;
 import std.array : array, join;
-import std.process : Pid, pipe, ProcessException, spawnProcess, wait;
+import std.conv : ConvException, to;
+import std.file : chdir;
+import std.process : environment, Pid, pipe, ProcessException, spawnProcess, wait;
 import std.stdio : File, stderr, stdin, stdout;
 import ast : Command, CommandElement, Dispatcher, PipeCommand, SimpleCommand, Word;
+
+string homeDir()
+{
+    return environment.get("HOME");
+}
 
 class Evaluator
 {
     mixin Dispatcher;
+
+    private int _lastExitStatus = 0;
 
     void run(Command node)
     {
@@ -16,12 +25,14 @@ class Evaluator
 
             foreach (pid; pids)
             {
-                pid.wait();
+                _lastExitStatus = pid.wait();
             }
         }
         catch (ProcessException e)
         {
             stderr.writeln(e.message);
+
+            _lastExitStatus = 127;
         }
     }
 
@@ -44,9 +55,19 @@ class Evaluator
     {
         auto args = node.elements.map!(el => eval(el)).array;
 
-        // コマンドを実行する
-        auto pid = spawnProcess(args, stdin, stdout, stderr);
-        return [pid];
+        switch (args[0])
+        {
+        case "cd":
+            return builtinCd(args);
+
+        case "exit":
+            return builtinExit(args);
+
+        default:
+            // コマンドを実行する
+            auto pid = spawnProcess(args, stdin, stdout, stderr);
+            return [pid];
+        }
     }
 
     private string eval(CommandElement node)
@@ -57,5 +78,39 @@ class Evaluator
     private string eval(Word word)
     {
         return word.text;
+    }
+
+    /**
+     * cd コマンド
+     */
+    private Pid[] builtinCd(string[] args)
+    {
+        const dir = args.length > 1 ? args[1] : homeDir();
+        chdir(dir);
+
+        return [];
+    }
+
+    /**
+     * exit コマンド
+     */
+    private Pid[] builtinExit(string[] args)
+    {
+        import core.stdc.stdlib : exit;
+
+        if (args.length > 1)
+        {
+            try
+            {
+                _lastExitStatus = args[1].to!int;
+            }
+            catch (ConvException e)
+            {
+                stderr.writeln("exit: numeric argument required");
+                _lastExitStatus = 1;
+            }
+        }
+
+        exit(_lastExitStatus);
     }
 }
