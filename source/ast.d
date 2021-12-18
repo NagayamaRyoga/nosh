@@ -8,20 +8,33 @@ template DefaultConstructor()
 
 template Dispatcher()
 {
-    auto dispatch(string method, Args...)(Command node, Args args)
+    auto dispatch(string method, Args...)(Command node, auto ref Args args)
     {
         import std.algorithm : castSwitch;
 
-        return node.castSwitch!((SimpleCommand node) => mixin("this." ~ method ~ "(node, args)"),)();
+        return node.castSwitch!((PipeCommand node) => mixin("this." ~ method ~ "(node, args)"),
+                (SimpleCommand node) => mixin("this." ~ method ~ "(node, args)"),)();
     }
 }
 
 /**
  * command :==
+ *      pipe_command
  *      simple_command
  */
 abstract class Command
 {
+}
+
+/**
+ * pipe_command :==
+ *      command '|' command
+ */
+class PipeCommand : Command
+{
+    mixin DefaultConstructor;
+
+    Command left, right;
 }
 
 /**

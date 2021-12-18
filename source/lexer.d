@@ -9,7 +9,7 @@ private bool isSpace(dchar c)
 
 private bool isSpecial(dchar c)
 {
-    return c == '\n' || c == '\r' || c == '\'' || c == '"';
+    return c == '\n' || c == '\r' || c == '\'' || c == '"' || c == '|';
 }
 
 private bool isWord(dchar c)
@@ -21,6 +21,7 @@ enum TokenKind
 {
     eof,
     eol,
+    pipe,
     word,
 }
 
@@ -58,7 +59,7 @@ class Lexer
      * トークンを1つ読み進める
      *
      * token :==
-     *      SP? (EOF | EOL | WORD)
+     *      SP? (EOF | EOL | SYMBOL | WORD)
      */
     Token read()
     {
@@ -88,6 +89,12 @@ class Lexer
         {
             // DSTRING
             return readDoubleQuotedString(hasLeadingSpace);
+        }
+
+        if (c.isSpecial)
+        {
+            // SYMBOL
+            return readSymbol(hasLeadingSpace);
         }
 
         // WORD
@@ -137,6 +144,24 @@ class Lexer
         }
 
         return Token(TokenKind.eol, text, hasLeadingSpace);
+    }
+
+    /**
+     * 記号
+     *
+     * SYMBOL :==
+     *      "|"
+     */
+    private Token readSymbol(bool hasLeadingSpace)
+    {
+        switch (consumeCh())
+        {
+        case '|':
+            return Token(TokenKind.pipe, "|", hasLeadingSpace);
+
+        default:
+            throw new Exception("unknown symbol");
+        }
     }
 
     /**

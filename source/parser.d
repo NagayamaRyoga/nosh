@@ -1,7 +1,7 @@
 import std.format : format;
 import std.range : back, empty, front, popFront;
 import std.stdio : File;
-import ast : Command, CommandElement, SimpleCommand, Word;
+import ast : Command, CommandElement, PipeCommand, SimpleCommand, Word;
 import lexer : Lexer, Token, TokenKind;
 
 class Parser
@@ -48,17 +48,45 @@ class Parser
 
     /**
      * command_line :==
-     *      command EOL
+     *      pipe_command EOL
      */
     private Command parseCommandLine()
     {
-        // command
-        auto command = parseCommand();
+        // pipe_command
+        auto command = parsePipeCommand();
 
         // EOL
         consumeTokenIf(TokenKind.eol);
 
         return command;
+    }
+
+    /**
+     * pipe_command :==
+     *      pipe_command '|' EOL* command
+     *      command
+     */
+    private Command parsePipeCommand()
+    {
+        // command
+        auto left = parseCommand();
+
+        // '|' EOL* command
+        while (currentToken().kind == TokenKind.pipe)
+        {
+            // '|'
+            consumeToken();
+
+            // EOL*
+            skipEol();
+
+            // command
+            auto right = parseCommand();
+
+            left = new PipeCommand(left, right);
+        }
+
+        return left;
     }
 
     /**
@@ -109,6 +137,13 @@ class Parser
         const token = expectAndConsumeToken(TokenKind.word);
 
         return new Word(token.text);
+    }
+
+    private void skipEol()
+    {
+        while (consumeTokenIf(TokenKind.eol))
+        {
+        }
     }
 
     private void fillQueue(size_t n)

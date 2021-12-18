@@ -1,21 +1,8 @@
 import std.algorithm : map;
 import std.array : array, join;
-import std.process : ProcessException, spawnProcess, wait;
-import std.stdio : stderr;
-import ast : Command, CommandElement, Dispatcher, SimpleCommand, Word;
-
-// コマンドを実行する
-void execute(string[] args)
-{
-    try
-    {
-        spawnProcess(args).wait();
-    }
-    catch (ProcessException e)
-    {
-        stderr.writeln(e.message);
-    }
-}
+import std.process : Pid, pipe, ProcessException, spawnProcess, wait;
+import std.stdio : File, stderr, stdin, stdout;
+import ast : Command, CommandElement, Dispatcher, PipeCommand, SimpleCommand, Word;
 
 class Evaluator
 {
@@ -23,14 +10,43 @@ class Evaluator
 
     void run(Command node)
     {
-        dispatch!"eval"(node);
+        try
+        {
+            auto pids = dispatch!"eval"(node, stdin, stdout, stderr);
+
+            foreach (pid; pids)
+            {
+                pid.wait();
+            }
+        }
+        catch (ProcessException e)
+        {
+            stderr.writeln(e.message);
+        }
     }
 
-    private void eval(SimpleCommand node)
+    private Pid[] eval(PipeCommand node, File stdin, File stdout, File stderr)
+    {
+        auto p = pipe();
+        auto readEnd = p.readEnd();
+        auto writeEnd = p.writeEnd();
+
+        // 左辺
+        auto leftPids = dispatch!"eval"(node.left, stdin, writeEnd, stderr);
+
+        // 右辺
+        auto rightPids = dispatch!"eval"(node.right, readEnd, stdout, stderr);
+
+        return leftPids ~ rightPids;
+    }
+
+    private Pid[] eval(SimpleCommand node, File stdin, File stdout, File stderr)
     {
         auto args = node.elements.map!(el => eval(el)).array;
 
-        execute(args);
+        // コマンドを実行する
+        auto pid = spawnProcess(args, stdin, stdout, stderr);
+        return [pid];
     }
 
     private string eval(CommandElement node)
