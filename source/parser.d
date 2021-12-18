@@ -1,5 +1,7 @@
+import std.format : format;
 import std.range : back, empty, front, popFront;
 import std.stdio : File;
+import ast : Command, CommandElement, SimpleCommand, Word;
 import lexer : Lexer, Token, TokenKind;
 
 class Parser
@@ -26,18 +28,18 @@ class Parser
      *      EOL
      *      command_line
      */
-    string[] parse()
+    Command parse()
     {
         if (currentToken().isEof)
         {
             // EOF
-            return [];
+            return null;
         }
 
         if (consumeTokenIf(TokenKind.eol))
         {
             // EOL
-            return [];
+            return null;
         }
 
         // command_line
@@ -48,43 +50,65 @@ class Parser
      * command_line :==
      *      command EOL
      */
-    private string[] parseCommandLine()
+    private Command parseCommandLine()
     {
         // command
-        auto args = parseCommand();
+        auto command = parseCommand();
 
         // EOL
         consumeTokenIf(TokenKind.eol);
 
-        return args;
+        return command;
     }
 
     /**
      * command :==
-     *      WORD*
+     *      command_element+
      */
-    private string[] parseCommand()
+    private Command parseCommand()
     {
-        string[] args = [];
+        // command_element+
+        CommandElement[] elements = [];
 
-        // WORD*
-        while (currentToken().isWord)
+        do
         {
-            const token = currentToken();
-
-            if (args.empty || token.hasLeadingSpace)
-            {
-                args ~= token.text;
-            }
-            else
-            {
-                args.back ~= token.text;
-            }
-
-            consumeToken();
+            // command_element
+            elements ~= parseCommandElement();
         }
+        while (currentToken().isWord);
 
-        return args;
+        return new SimpleCommand(elements);
+    }
+
+    /**
+     * command_element :==
+     *      word+
+     */
+    private CommandElement parseCommandElement()
+    {
+        // word+
+        Word[] words = [];
+
+        do
+        {
+            // word
+            words ~= parseWord();
+        }
+        while (currentToken().isWord && !currentToken().hasLeadingSpace);
+
+        return new CommandElement(words);
+    }
+
+    /**
+     * word :==
+     *      WORD
+     */
+    private Word parseWord()
+    {
+        // WORD
+        const token = expectAndConsumeToken(TokenKind.word);
+
+        return new Word(token.text);
     }
 
     private void fillQueue(size_t n)
@@ -117,5 +141,16 @@ class Parser
         }
 
         return false;
+    }
+
+    private Token expectAndConsumeToken(TokenKind expected)
+    {
+        const token = currentToken();
+        if (token.kind != expected)
+        {
+            throw new Exception("unexpected %s".format(token.kind));
+        }
+
+        return consumeToken();
     }
 }

@@ -1,25 +1,13 @@
-import std.process : ProcessException, spawnProcess, wait;
-import std.stdio : stderr, stdin, write;
+import std.stdio : stdin, write;
+import eval : Evaluator;
 import parser : Parser;
-
-// コマンドを実行する
-void execute(string[] args)
-{
-    try
-    {
-        spawnProcess(args).wait();
-    }
-    catch (ProcessException e)
-    {
-        stderr.writeln(e.message);
-    }
-}
 
 void main()
 {
     const prompt = "nosh % ";
 
     auto parser = new Parser(stdin);
+    auto evaluator = new Evaluator();
 
     while (!parser.eof)
     {
@@ -27,12 +15,11 @@ void main()
         write(prompt);
 
         // 入力を構文解析する
-        auto args = parser.parse();
+        auto command = parser.parse();
 
-        if (args.length > 0)
+        if (command !is null)
         {
-            // 解析結果のコマンドを実行する
-            execute(args);
+            evaluator.run(command);
         }
     }
 }
