@@ -64,6 +64,7 @@ class Parser
     /**
      * pipe_command :==
      *      pipe_command '|' EOL* command
+     *      pipe_command '|&' EOL* command
      *      command
      */
     private Command parsePipeCommand()
@@ -71,10 +72,12 @@ class Parser
         // command
         auto left = parseCommand();
 
-        // '|' EOL* command
-        while (currentToken().kind == TokenKind.pipe)
+        // ('|' | '|&') EOL* command
+        while (currentToken().kind == TokenKind.pipe || currentToken().kind == TokenKind.pipeAll)
         {
-            // '|'
+            const all = currentToken().kind == TokenKind.pipeAll;
+
+            // '|' | '|&'
             consumeToken();
 
             // EOL*
@@ -83,7 +86,7 @@ class Parser
             // command
             auto right = parseCommand();
 
-            left = new PipeCommand(left, right);
+            left = new PipeCommand(left, right, all);
         }
 
         return left;

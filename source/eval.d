@@ -2,9 +2,11 @@ import std.algorithm : map;
 import std.array : array, join;
 import std.conv : ConvException, to;
 import std.file : chdir;
-import std.process : environment, Pid, pipe, ProcessException, spawnProcess, wait;
+import std.process : Config, environment, Pid, pipe, ProcessException, spawnProcess, wait;
 import std.stdio : File, stderr, stdin, stdout;
 import ast : Command, CommandElement, Dispatcher, PipeCommand, SimpleCommand, Word;
+
+import std.stdio;
 
 string homeDir()
 {
@@ -39,11 +41,11 @@ class Evaluator
     private Pid[] eval(PipeCommand node, File stdin, File stdout, File stderr)
     {
         auto p = pipe();
-        auto readEnd = p.readEnd();
-        auto writeEnd = p.writeEnd();
+        auto readEnd = p.readEnd;
+        auto writeEnd = p.writeEnd;
 
         // 左辺
-        auto leftPids = dispatch!"eval"(node.left, stdin, writeEnd, stderr);
+        auto leftPids = dispatch!"eval"(node.left, stdin, writeEnd, node.all ? writeEnd : stderr);
 
         // 右辺
         auto rightPids = dispatch!"eval"(node.right, readEnd, stdout, stderr);
@@ -65,7 +67,8 @@ class Evaluator
 
         default:
             // コマンドを実行する
-            auto pid = spawnProcess(args, stdin, stdout, stderr);
+            auto pid = spawnProcess(args, stdin, stdout, stderr, null,
+                    Config.retainStdin | Config.retainStdout | Config.retainStderr);
             return [pid];
         }
     }

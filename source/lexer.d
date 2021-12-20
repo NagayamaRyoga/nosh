@@ -19,9 +19,10 @@ private bool isWord(dchar c)
 
 enum TokenKind
 {
-    eof,
-    eol,
-    pipe,
+    eof, // ファイルの終端
+    eol, // 改行
+    pipe, // |
+    pipeAll, // |&
     word,
 }
 
@@ -157,6 +158,12 @@ class Lexer
         switch (consumeCh())
         {
         case '|':
+            if (currentCh() == '&')
+            {
+                consumeCh();
+                return Token(TokenKind.pipeAll, "|&", hasLeadingSpace);
+            }
+
             return Token(TokenKind.pipe, "|", hasLeadingSpace);
 
         default:

@@ -29,12 +29,14 @@ abstract class Command
 /**
  * pipe_command :==
  *      command '|' command
+ *      command '|&' command
  */
 class PipeCommand : Command
 {
     mixin DefaultConstructor;
 
     Command left, right;
+    bool all;
 }
 
 /**
